@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hệ Thống Quét Vé A11K37 - Nhóm 1</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f8ff; display: flex; flex-direction: column; align-items: center; padding-top: 50px; }
+        
+        /* Giao diện vé */
+        .ticket-wrapper { position: relative; width: 650px; height: 260px; filter: drop-shadow(0 15px 15px rgba(0,0,0,0.1)); }
+        
+        .ticket { width: 100%; height: 100%; background: white; border-radius: 15px; display: flex; overflow: hidden; position: relative; transition: all 0.3s ease; }
+        
+        /* Cạnh răng cưa */
+        .ticket::before, .ticket::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            width: 15px;
+            height: 100%;
+            background-image: radial-gradient(circle, transparent 70%, white 70%);
+            background-size: 30px 30px;
+            background-position: 0 -15px;
+            z-index: 10;
+        }
+        .ticket::before { left: -7px; }
+        .ticket::after { right: -7px; transform: rotate(180deg); }
+
+        .left { width: 70%; padding: 30px 40px; border-right: 3px dashed #add8e6; position: relative; background: #fff; z-index: 5; }
+        .right { width: 30%; background: #e0f2f1; /* Xanh dương nhạt */ color: #333; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 5; }
+        
+        /* Hiệu ứng đục lỗ ở đường xé */
+        .punch-hole {
+            position: absolute;
+            right: -10px;
+            width: 20px;
+            height: 20px;
+            background: #f0f8ff;
+            border-radius: 50%;
+            z-index: 15;
+        }
+        .punch-hole.top { top: -10px; }
+        .punch-hole.bottom { bottom: -10px; }
+
+        /* Chi tiết văn bản */
+        .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #333; min-height: 28px; }
+        .flight-no { font-size: 28px; color: #0077b6; /* Xanh dương đậm hơn */ font-weight: 900; }
+        .ticket-id { font-size: 35px; font-weight: bold; color: #0077b6; margin: 10px 0; }
+        
+        /* Giả lập mã QR */
+        .qr-code {
+            width: 80px;
+            height: 80px;
+            background: url('https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=A11K37-G1') no-repeat center center;
+            background-size: cover;
+            border: 2px solid #fff;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        /* Nút điều khiển */
+        .controls { margin-top: 30px; display: flex; gap: 15px; }
+        button { padding: 12px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .btn-next { background: #00a896; color: white; }
+        .btn-next:hover { background: #00c4b1; transform: translateY(-2px); }
+        .btn-print { background: #546e7a; color: white; }
+
+        /* Hiệu ứng in */
+        @media print {
+            .controls, .instruction, .punch-hole { display: none; }
+            body { background: white; padding: 0; }
+            .ticket-wrapper { filter: none; width: 100%; height: auto; }
+            .ticket { box-shadow: none; border: 1px solid #ccc; border-radius: 0; }
+            .ticket::before, .ticket::after { display: none; } /* Tắt răng cưa khi in thật */
+        }
+    </style>
+</head>
+<body>
+
+<div class="instruction" style="margin-bottom: 20px; color: #666;">Nhập tên vào ô trống rồi nhấn <b>"Tiếp theo"</b> để nhảy số vé</div>
+
+<div class="ticket-wrapper">
+    <div class="ticket" id="ticket-capture">
+        <div class="punch-hole top"></div>
+        <div class="punch-hole bottom"></div>
+
+        <div class="left">
+            <div style="display: flex; justify-content: space-between;">
+                <div>
+                    <div class="label">Hành khách / Passenger</div>
+                    <input type="text" id="inputName" placeholder="Nhập tên tại đây..." style="font-size: 20px; font-weight: bold; border: none; border-bottom: 2px solid #add8e6; outline: none; width: 100%; color: #333; background: transparent;">
+                </div>
+                <div style="text-align: right;">
+                    <div class="label">Số hiệu / No.</div>
+                    <div class="flight-no">A11K37</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; margin-top: 30px;">
+                <div style="margin-right: 50px;">
+                    <div class="label">Nhóm / Group</div>
+                    <div class="value">NHÓM 1</div>
+                </div>
+                <div>
+                    <div class="label">Trạng thái / Status</div>
+                    <div class="value" style="color: #00a896;">ĐÃ QUÉT (OK)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="right">
+            <div class="label" style="color: #666;">Số thứ tự</div>
+            <div class="ticket-id" id="displayID">01</div>
+            <div class="qr-code"></div>
+            <div style="margin-top: 5px; font-size: 10px; color: #888;">AUTH CODE</div>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <button class="btn-next" onclick="nextTicket()">Tiếp theo (Next)</button>
+    <button class="btn-print" onclick="window.print()">In vé này (Print)</button>
+</div>
+
+<script>
+    let currentID = 1;
+
+    function nextTicket() {
+        const nameInput = document.getElementById('inputName');
+        
+        if (nameInput.value.trim() === "") {
+            alert("Vui lòng nhập tên hành khách trước khi sang vé tiếp theo!");
+            return;
+        }
+
+        // Tăng số thứ tự
+        currentID++;
+        
+        // Cập nhật hiển thị số vé (định dạng 01, 02...)
+        document.getElementById('displayID').innerText = currentID.toString().padStart(2, '0');
+        
+        // Xóa tên cũ để nhập tên mới
+        nameInput.value = "";
+        nameInput.focus();
+
+        // Hiệu ứng nháy nhẹ để biết đã đổi vé
+        const ticket = document.getElementById('ticket-capture');
+        ticket.style.transform = "scale(1.03) rotate(1deg)";
+        setTimeout(() => ticket.style.transform = "scale(1) rotate(0deg)", 200);
+    }
+</script>
+
+</body>
+</html>
